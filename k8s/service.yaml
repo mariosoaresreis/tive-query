@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tive-query
+  namespace: tive-query
+  labels:
+    app: tive-query
+spec:
+  # ClusterIP — traffic enters through the GKE Ingress / Gateway below.
+  type: ClusterIP
+  selector:
+    app: tive-query
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8081
+      protocol: TCP
+
+

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tive-query-config
+  namespace: tive-query
+  labels:
+    app: tive-query
+data:
+  SPRING_PROFILES_ACTIVE: "gcp"
+  DB_NAME: "tive"
+  DB_USER: "tive_reader"
+  REDIS_PORT: "6379"
+  PORT: "8081"
+

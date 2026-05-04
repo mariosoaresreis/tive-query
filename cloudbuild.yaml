@@ -1,0 +1,113 @@
+steps:
+  # ── Step 1: Build the Docker image ────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/tive-query:$COMMIT_SHA
+      - .
+
+  # ── Step 2: Push image to Artifact Registry ───────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/tive-query:$COMMIT_SHA
+
+  # ── Step 3: Authenticate kubectl against the target GKE cluster ───────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - container
+      - clusters
+      - get-credentials
+      - ${_GKE_CLUSTER}
+      - --region
+      - ${_REGION}
+      - --project
+      - $PROJECT_ID
+
+  # ── Step 4: Ensure the tive-query namespace exists ────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: kubectl
+    args:
+      - apply
+      - -f
+      - k8s/namespace.yaml
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}
+
+  # ── Step 5: Apply ConfigMap ───────────────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: kubectl
+    args:
+      - apply
+      - -f
+      - k8s/configmap.yaml
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}
+
+  # ── Step 6: Apply ServiceAccount (Workload Identity) ──────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: kubectl
+    args:
+      - apply
+      - -f
+      - k8s/serviceaccount.yaml
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}
+
+  # ── Step 7: Substitute image tag and apply Deployment ─────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        sed "s|REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/tive-query:IMAGE_TAG|${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/tive-query:$COMMIT_SHA|g" k8s/deployment.yaml > /workspace/deployment.rendered.yaml
+        kubectl apply -f /workspace/deployment.rendered.yaml
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}
+
+  # ── Step 8: Apply Service and HPA ────────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: kubectl
+    args:
+      - apply
+      - -f
+      - k8s/service.yaml
+      - -f
+      - k8s/hpa.yaml
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}
+
+  # ── Step 9: Wait for rollout to complete ─────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: kubectl
+    args:
+      - rollout
+      - status
+      - deployment/tive-query
+      - -n
+      - tive-query
+      - --timeout=120s
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/tive-query:$COMMIT_SHA
+
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: tive-repo
+  _GKE_CLUSTER: tive-cluster
+  # Override these per trigger in Cloud Build UI or via --substitutions flag.
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+

@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tive-query
+  namespace: tive-query
+  labels:
+    app: tive-query
+    version: "1.0.0"
+spec:
+  # Initial replica count — the HPA will scale this up/down.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tive-query
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: tive-query
+      annotations:
+        # Prometheus scrape annotation — works with standard prom-operator config.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: tive-query-sa
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: tive-query
+          # Image is substituted by Cloud Build at deploy time.
+          image: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/tive-query:IMAGE_TAG
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: tive-query-config
+          env:
+            # Secrets injected from GCP Secret Manager via External Secrets Operator
+            # or via workload identity + env injection. Replace with your preferred approach.
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tive-query-secrets
+                  key: db-password
+            - name: TIVE_QUERY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tive-query-secrets
+                  key: api-key
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: tive-query-secrets
+                  key: redis-host
+            - name: CLOUD_SQL_INSTANCE
+              valueFrom:
+                secretKeyRef:
+                  name: tive-query-secrets
+                  key: cloud-sql-instance
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                # Allow Kubernetes to drain connections before SIGTERM is sent.
+                command: ["sh", "-c", "sleep 5"]
+

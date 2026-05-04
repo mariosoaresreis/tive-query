@@ -1,0 +1,31 @@
+# Optional alternative to ingress.yaml when using GKE Gateway API.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: tive-query
+  namespace: tive-query
+  labels:
+    app: tive-query
+spec:
+  parentRefs:
+    # Replace with your shared Gateway name/namespace.
+    - name: tive-gateway
+      namespace: gateway-infra
+  hostnames:
+    - query.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1
+      backendRefs:
+        - name: tive-query
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /actuator/health
+      backendRefs:
+        - name: tive-query
+          port: 80
+

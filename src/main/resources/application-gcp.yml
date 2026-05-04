@@ -1,0 +1,15 @@
+spring:
+  config:
+    activate:
+      on-profile: gcp
+
+  datasource:
+    # Cloud SQL socket mode — works with Workload Identity on GKE.
+    # The Cloud SQL proxy sidecar or socket factory handles authentication.
+    url: jdbc:postgresql:///${DB_NAME:tive}?socketFactory=com.google.cloud.sql.postgres.SocketFactory&cloudSqlInstance=${CLOUD_SQL_INSTANCE}
+    username: ${DB_USER:tive_reader}
+    password: ${DB_PASSWORD}
+
+server:
+  port: ${PORT:8081}
+

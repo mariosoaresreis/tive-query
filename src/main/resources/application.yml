@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: tive-query
+
+  # PostgreSQL — read-only connection to the same DB managed by tive-webhook-receiver.
+  # Flyway is disabled: schema ownership belongs to tive-webhook-receiver.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:tive}}
+    username: ${DB_USER:tive_reader}
+    password: ${DB_PASSWORD:tive_reader}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # Keep pool small — this service is read-only and typically low-throughput.
+      maximum-pool-size: 5
+      minimum-idle: 2
+
+  jpa:
+    hibernate:
+      # Never touch the schema — tive-webhook-receiver owns migrations.
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+
+  flyway:
+    enabled: false
+
+  # Redis — connect to the same instance written by tive-webhook-receiver.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+server:
+  port: ${PORT:8081}
+
+# Query service properties
+tive:
+  query:
+    # API key expected in X-Api-Key header.  Override via environment variable.
+    api-key: ${TIVE_QUERY_API_KEY:changeme}
+    # Must match the key prefix used by tive-webhook-receiver's TrackerPositionStateService.
+    redis-position-prefix: "tive:tracker:position:"
+    default-page-size: 20
+    max-page-size: 200
+
+# Prometheus metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+
+

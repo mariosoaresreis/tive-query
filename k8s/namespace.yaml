@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tive-query
+  labels:
+    app.kubernetes.io/part-of: tive-platform
+    team: shiptrack
+

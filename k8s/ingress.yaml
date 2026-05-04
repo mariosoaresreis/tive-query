@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tive-query
+  namespace: tive-query
+  labels:
+    app: tive-query
+  annotations:
+    kubernetes.io/ingress.class: gce
+    # Enable NEG for container-native load balancing on GKE.
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  rules:
+    # Replace with your real DNS host.
+    - host: query.example.com
+      http:
+        paths:
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service:
+                name: tive-query
+                port:
+                  number: 80
+          - path: /actuator/health
+            pathType: Prefix
+            backend:
+              service:
+                name: tive-query
+                port:
+                  number: 80
+
